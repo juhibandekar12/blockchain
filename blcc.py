@@ -1,46 +1,64 @@
 import streamlit as st
 import hashlib
 
-# Initialize hospital ledger in session state if it doesn't exist
-if 'hospital_ledger' not in st.session_state:
-    st.session_state.hospital_ledger = []
+# Initialize hospital school attendance ledger in session state
+if 'hospital_school_attendance_ledger' not in st.session_state:
+    st.session_state.hospital_school_attendance_ledger = []
 
-st.title("Hospital Ledger Management")
+# Function to create a hash of a record
+def generate_hash(record):
+    record_str = f"{record['student_name']}{record['date']}{record['status']}{record['previous_hash']}"
+    return hashlib.sha256(record_str.encode()).hexdigest()
 
-st.header("Add a Patient Visit")
+# Function to add an attendance record
+def add_student_attendance(student_name, date, status):
+    previous_hash = (
+        st.session_state.hospital_school_attendance_ledger[-1]["hash"]
+        if st.session_state.hospital_school_attendance_ledger
+        else "0"
+    )
 
-# Create input fields for patient details
-patient_name = st.text_input("Enter the patient's name")
-treatment = st.text_input("Enter the treatment received")
-cost = st.number_input("Enter the cost of the treatment ($)", min_value=0.0, step=0.01)
+    record = {
+        "student_name": student_name,
+        "date": str(date),
+        "status": status,
+        "previous_hash": previous_hash,
+    }
 
-# Function to create a hash for a patient's name
-def generate_patient_hash(patient_name):
-    return hashlib.sha256(patient_name.encode()).hexdigest()
+    # Generate the hash
+    record["hash"] = generate_hash(record)
 
-# Button to add visit
-if st.button("Add Visit"):
-    if patient_name and treatment:
-        # Generate a unique hash for the patient's name
-        patient_hash = generate_patient_hash(patient_name)
-        
-        # Create a dictionary for the visit with hashed patient name
-        visit = {
-            "patient_name_hash": patient_hash,
-            "patient_name": patient_name,  # Keep original name for display (can be omitted for privacy)
-            "treatment": treatment,
-            "cost": cost
-        }
-        
-        # Add the visit to the hospital ledger
-        st.session_state.hospital_ledger.append(visit)
-        st.success(f"Visit added for {patient_name} with treatment {treatment} costing ${cost}.")
-    else:
-        st.error("Please fill in all the fields.")
+    # Add the record
+    st.session_state.hospital_school_attendance_ledger.append(record)
+    st.success(f"✅ Attendance recorded for {student_name} on {date} as {status}.")
 
-# Display the hospital ledger
-if st.session_state.hospital_ledger:
-    st.header("Hospital Ledger")
-    for visit in st.session_state.hospital_ledger:
-        # Display the original patient name along with the hashed value
-        st.write(f"*Patient:* {visit['patient_name']} (Hash: {visit['patient_name_hash']})  |  *Treatment:* {visit['treatment']}  |  *Cost:* ${visit['cost']}")
+# Streamlit app layout
+st.set_page_config(page_title="Hospital School Attendance Ledger", page_icon="🏥")
+st.title("🏥 Hospital School Attendance Ledger (with Hashing)")
+
+st.subheader("➕ Add New Attendance Record")
+
+# Inputs inside a form for better UX
+with st.form("attendance_form"):
+    student_name = st.text_input("Student Name")
+    date = st.date_input("Date of Attendance")
+    status = st.selectbox("Status", ["Present", "Absent"])
+    submitted = st.form_submit_button("Add Attendance Record")
+
+    if submitted:
+        if student_name.strip() == "":
+            st.error("Please enter the student's name.")
+        else:
+            add_student_attendance(student_name, date, status)
+
+st.divider()
+
+# Display ledger
+st.subheader("📋 Ledger Records")
+
+if st.session_state.hospital_school_attendance_ledger:
+    for idx, record in enumerate(st.session_state.hospital_school_attendance_ledger, start=1):
+        with st.expander(f"Record {idx}: {record['student_name']} on {record['date']}"):
+            st.json(record)
+else:
+    st.info("No records yet. Please add attendance.")
