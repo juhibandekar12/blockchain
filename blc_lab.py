@@ -1,41 +1,49 @@
-import time
+import streamlit as st
 import hashlib
+import time
 import json
 
 # -------------------------
-# 🧱 Genesis Block Creation
+# Initialize Blockchain
 # -------------------------
-blockchain = [
-    {
+def create_genesis_block():
+    genesis_data = {"info": "Genesis Block"}
+    genesis_hash = hashlib.sha256("Genesis Block".encode()).hexdigest()
+    return {
         "index": 0,
         "timestamp": time.time(),
-        "data": {"info": "Genesis Block"},
+        "data": genesis_data,
         "previous_hash": "0",
-        "hash": hashlib.sha256("Genesis Block".encode()).hexdigest()
+        "hash": genesis_hash
     }
-]
+
+if "blockchain" not in st.session_state:
+    st.session_state.blockchain = [create_genesis_block()]
 
 # -------------------------
-# ➕ Add a New Block
+# Hashing Function
+# -------------------------
+def compute_hash(index, timestamp, data, previous_hash):
+    block_string = f"{index}{timestamp}{json.dumps(data, sort_keys=True)}{previous_hash}"
+    return hashlib.sha256(block_string.encode()).hexdigest()
+
+# -------------------------
+# Add a New Block
 # -------------------------
 def add_block(student_id, name, grades):
-    previous_block = blockchain[-1]
+    previous_block = st.session_state.blockchain[-1]
     index = previous_block["index"] + 1
     timestamp = time.time()
     previous_hash = previous_block["hash"]
 
-    # Prepare data
     data = {
         "student_id": student_id,
         "name": name,
         "grades": grades
     }
 
-    # Convert data to JSON string for hashing
-    block_string = f"{index}{timestamp}{json.dumps(data, sort_keys=True)}{previous_hash}"
-    block_hash = hashlib.sha256(block_string.encode()).hexdigest()
+    block_hash = compute_hash(index, timestamp, data, previous_hash)
 
-    # Create new block
     new_block = {
         "index": index,
         "timestamp": timestamp,
@@ -44,51 +52,46 @@ def add_block(student_id, name, grades):
         "hash": block_hash
     }
 
-    blockchain.append(new_block)
-    print(f"\n✅ Block {index} added for {name}!\n")
+    st.session_state.blockchain.append(new_block)
+    st.success(f"✅ Block {index} added for {name}!")
 
 # -------------------------
-# 🖨️ Display the Blockchain
+# Streamlit App UI
 # -------------------------
-def display_blockchain():
-    print("\n📜 Final Blockchain:")
-    print(json.dumps(blockchain, indent=4))
+st.title("📘 School Report Card Blockchain")
+
+st.subheader("➕ Add Student Report Card")
+with st.form("add_form", clear_on_submit=True):
+    student_id = st.text_input("Student ID")
+    name = st.text_input("Student Name")
+    subjects_input = st.text_area("Enter subjects and grades (e.g., Math:A, English:B+)", height=100)
+
+    submitted = st.form_submit_button("Add to Blockchain")
+
+    if submitted:
+        if not student_id or not name or not subjects_input:
+            st.warning("Please fill in all fields.")
+        else:
+            grades = {}
+            try:
+                pairs = subjects_input.split(",")
+                for pair in pairs:
+                    subject, grade = pair.strip().split(":")
+                    grades[subject.strip()] = grade.strip()
+                add_block(student_id, name, grades)
+            except Exception as e:
+                st.error(f"❌ Invalid input format. Use 'Subject:Grade'. Error: {e}")
 
 # -------------------------
-# 👨‍🏫 Interactive Input Loop
+# Display Blockchain
 # -------------------------
-while True:
-    print("\nEnter student report card data (or type 'exit' to quit):")
-    student_id = input("Student ID: ")
-    if student_id.lower() == "exit":
-        break
-    name = input("Student Name: ")
+st.subheader("📜 Blockchain Explorer")
 
-    grades = {}
-    print("Enter subject and grade (type 'done' when finished):")
-    while True:
-        subject = input("Subject: ")
-        if subject.lower() == "done":
-            break
-        grade = input("Grade: ")
-        grades[subject] = grade
-
-    add_block(student_id, name, grades)
-
-# -------------------------
-# 🖨️ Print Blockchain at End
-# -------------------------
-display_blockchain()
-# -------------------------
-# 🖨️ Display the Blockchain with Hashes
-# -------------------------
-def display_blockchain():
-    print("\n📜 Final Blockchain with Hashes:\n")
-    for block in blockchain:
-        print(f"Block Index   : {block['index']}")
-        print(f"Timestamp     : {block['timestamp']}")
-        print(f"Student Data  : {json.dumps(block['data'], indent=2)}")
-        print(f"Previous Hash : {block['previous_hash']}")
-        print(f"Current Hash  : {block['hash']}")
-        print("-" * 60)
-
+for block in st.session_state.blockchain:
+    with st.expander(f"🔗 Block {block['index']} - {block['data'].get('name', 'Genesis')}"):
+        st.write(f"**Index:** {block['index']}")
+        st.write(f"**Timestamp:** {block['timestamp']}")
+        st.write("**Data:**")
+        st.json(block["data"])
+        st.write(f"**Previous Hash:** `{block['previous_hash']}`")
+        st.write(f"**Current Hash:** `{block['hash']}`")
